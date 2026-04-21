@@ -1,0 +1,292 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User roles enum
+enum UserRole {
+  USER
+  ADMIN
+  TRAINER
+}
+
+// Subscription levels enum
+enum SubscriptionLevel {
+  FREE
+  BASIC
+  PREMIUM
+  VIP
+}
+
+// Routine difficulty levels
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+// Routine types
+enum RoutineType {
+  STRENGTH
+  CARDIO
+  FLEXIBILITY
+  CALISTHENICS
+  HIIT
+  YOGA
+  PILATES
+}
+
+// Challenge submission status
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
+}
+
+// User model
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  name         String
+  phone        String?
+  profileImage String?
+  role         UserRole @default(USER)
+  isActive     Boolean @default(true)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  subscriptions      UserSubscription[]
+  routineProgress    RoutineProgress[]
+  challengeSubmissions ChallengeSubmission[]
+  createdRoutines    Routine[] @relation("RoutineCreator")
+  
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+// Subscription plans
+model SubscriptionPlan {
+  id          String            @id @default(cuid())
+  name        String @unique
+  description String?
+  price       Float
+  level       SubscriptionLevel @unique
+  features    Json              // JSON array of features
+  maxRoutines Int?           // null = unlimited
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  userSubscriptions UserSubscription[]
+  
+  @@map("subscription_plans")
+}
+
+// User subscriptions
+model UserSubscription {
+  id       String  @id @default(cuid())
+  userId   String
+  planId   String
+  isActive Boolean @default(true)
+  
+  // Subscription period
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  
+  // Payment tracking
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+  
+  @@unique([userId, planId])
+  @@index([userId])
+  @@index([isActive])
+  @@index([endDate])
+  @@map("user_subscriptions")
+}
+
+// Routines
+model Routine {
+  id               String          @id @default(cuid())
+  name             String
+  description      String
+  level            DifficultyLevel
+  type             RoutineType
+  duration         Int    // in minutes
+  estimatedCalories Int?
+  thumbnailUrl     String?
+  videoPreviewUrl  String?
+  
+  // Access control
+  requiredLevel SubscriptionLevel @default(FREE)
+  isPublished   Boolean @default(false)
+  creatorId     String?
+  
+  // SEO and metadata
+  tags      Json // Array of tags
+  equipment Json // Required equipment
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  creator          User?             @relation("RoutineCreator", fields: [creatorId], references: [id])
+  steps            RoutineStep[]
+  userProgress     RoutineProgress[]
+  
+  @@index([type])
+  @@index([level])
+  @@index([requiredLevel])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@map("routines")
+}
+
+// Routine steps (exercises within a routine)
+model RoutineStep {
+  id          String  @id @default(cuid())
+  routineId   String
+  stepNumber  Int     // Order in the routine
+  name        String
+  description String?
+  
+  // Exercise details
+  reps         Int?     // Number of repetitions
+  sets         Int?     // Number of sets
+  duration     Int?     // Duration in seconds
+  restTime     Int?     // Rest time in seconds
+  videoUrl     String?  // Exercise demonstration video
+  imageUrl     String?  // Exercise image
+  tips         Json     // Array of tips
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  
+  @@unique([routineId, stepNumber])
+  @@map("routine_steps")
+}
+
+// User progress tracking
+model RoutineProgress {
+  id                String   @id @default(cuid())
+  userId            String
+  routineId         String
+  completedSteps    Int      @default(0)
+  totalSteps        Int
+  completionRate    Float    @default(0) // Percentage 0-100
+  
+  // Performance metrics
+  timeSpent         Int?     // Total time in minutes
+  caloriesBurned    Int?
+  difficulty        Int?     // User rated difficulty 1-5
+  satisfaction      Int?     // User satisfaction 1-5
+  
+  // Completion tracking
+  isCompleted       Boolean  @default(false)
+  lastCompletedStep Int?
+  completedAt       DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, routineId])
+  @@index([userId])
+  @@index([isCompleted])
+  @@index([completedAt])
+  @@map("routine_progress")
+}
+
+// Challenges
+model Challenge {
+  id          String  @id @default(cuid())
+  name        String
+  description String
+  instructions String
+  
+  // Challenge details
+  difficulty    DifficultyLevel
+  duration      Int?   // Duration in days
+  maxScore      Int    @default(100)
+  thumbnailUrl  String?
+  
+  // Requirements
+  requiredLevel SubscriptionLevel @default(FREE)
+  isActive      Boolean @default(true)
+  
+  // Submission settings
+  allowMultipleSubmissions Boolean @default(false)
+  submissionDeadline       DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  submissions ChallengeSubmission[]
+  
+  @@index([difficulty])
+  @@index([isActive])
+  @@map("challenges")
+}
+
+// Challenge submissions
+model ChallengeSubmission {
+  id          String           @id @default(cuid())
+  userId      String
+  challengeId String
+  videoUrl    String
+  description String?
+  
+  // Scoring
+  status      SubmissionStatus @default(PENDING)
+  score       Int?             // 0-100
+  feedback    String?          // Trainer feedback
+  reviewedBy  String?          // Trainer who reviewed
+  reviewedAt  DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  
+  @@index([status])
+  @@index([userId])
+  @@map("challenge_submissions")
+}
