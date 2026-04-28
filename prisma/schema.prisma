@@ -329,8 +329,8 @@ model ChallengeSubmission {
 model UserPurchase {
   id          String   @id @default(cuid())
   userId      String
-  itemId      String   // routineId or challengeId
-  itemType    String   // 'ROUTINE' | 'CHALLENGE'
+  itemId      String   // routineId, challengeId or bookId
+  itemType    String   // 'ROUTINE' | 'CHALLENGE' | 'BOOK'
   pricePaid   Float
   
   // Timestamps
@@ -343,4 +343,29 @@ model UserPurchase {
   @@index([userId])
   @@index([itemId])
   @@map("user_purchases")
+}
+
+// Books
+model Book {
+  id          String  @id @default(cuid())
+  title       String
+  author      String
+  description String  @db.Text
+  coverUrl    String?
+  fileUrl     String? // PDF/ebook URL (entregado tras compra)
+  previewUrl  String? // Primeras páginas gratis
+  price       Float
+  pages       Int?
+  isbn        String?
+  isPublished Boolean @default(false)
+  featured    Boolean @default(false)
+  tags        Json    // Array of strings
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([isPublished])
+  @@index([featured])
+  @@map("books")
 }
