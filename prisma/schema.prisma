@@ -52,6 +52,13 @@ enum SubmissionStatus {
   UNDER_REVIEW
 }
 
+// Access type for routines and challenges
+enum AccessType {
+  FREE         // Gratis para todos
+  SUBSCRIPTION // Requiere suscripción (usa requiredLevel)
+  ONE_TIME     // Pago único
+}
+
 // User model
 model User {
   id           String   @id @default(cuid())
@@ -72,6 +79,7 @@ model User {
   routineProgress    RoutineProgress[]
   challengeSubmissions ChallengeSubmission[]
   createdRoutines    Routine[] @relation("RoutineCreator")
+  purchases          UserPurchase[]
   
   @@index([email])
   @@index([role])
@@ -142,7 +150,9 @@ model Routine {
   videoPreviewUrl  String?
   
   // Access control
+  accessType    AccessType        @default(FREE)
   requiredLevel SubscriptionLevel @default(FREE)
+  price         Float?            // Precio en caso de accessType = ONE_TIME
   isPublished   Boolean @default(false)
   creatorId     String?
   
@@ -156,7 +166,7 @@ model Routine {
   
   // Relations
   creator          User?             @relation("RoutineCreator", fields: [creatorId], references: [id])
-  steps            RoutineStep[]
+  days             RoutineDay[]
   userProgress     RoutineProgress[]
   
   @@index([type])
@@ -167,14 +177,35 @@ model Routine {
   @@map("routines")
 }
 
-// Routine steps (exercises within a routine)
-model RoutineStep {
+// Routine days (Día 1, Día 2, etc.)
+model RoutineDay {
   id          String  @id @default(cuid())
   routineId   String
-  stepNumber  Int     // Order in the routine
+  dayNumber   Int
+  name        String   // "Día 1 - Empuje", "Día 2 - Jale", etc.
+  description String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  routine Routine       @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  steps   RoutineStep[]
+
+  @@unique([routineId, dayNumber])
+  @@index([routineId])
+  @@map("routine_days")
+}
+
+// Routine steps (individual exercises within a day)
+model RoutineStep {
+  id          String  @id @default(cuid())
+  dayId       String
+  stepNumber  Int     // Order within the day
   name        String
   description String?
-  
+
   // Exercise details
   reps         Int?     // Number of repetitions
   sets         Int?     // Number of sets
@@ -183,15 +214,16 @@ model RoutineStep {
   videoUrl     String?  // Exercise demonstration video
   imageUrl     String?  // Exercise image
   tips         Json     // Array of tips
-  
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
-  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
-  
-  @@unique([routineId, stepNumber])
+  day RoutineDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@unique([dayId, stepNumber])
+  @@index([dayId])
   @@map("routine_steps")
 }
 
@@ -244,7 +276,9 @@ model Challenge {
   thumbnailUrl  String?
   
   // Requirements
+  accessType    AccessType        @default(FREE)
   requiredLevel SubscriptionLevel @default(FREE)
+  price         Float?            // Precio en caso de accessType = ONE_TIME
   isActive      Boolean @default(true)
   
   // Submission settings
@@ -289,4 +323,24 @@ model ChallengeSubmission {
   @@index([status])
   @@index([userId])
   @@map("challenge_submissions")
+}
+
+// One-time purchases (routines or challenges)
+model UserPurchase {
+  id          String   @id @default(cuid())
+  userId      String
+  itemId      String   // routineId or challengeId
+  itemType    String   // 'ROUTINE' | 'CHALLENGE'
+  pricePaid   Float
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, itemId, itemType])
+  @@index([userId])
+  @@index([itemId])
+  @@map("user_purchases")
 }

@@ -7,6 +7,7 @@ import { env } from './config/env.js'
 import { authRoutes } from './routes/auth.js'
 import { routineRoutes } from './routes/routines.js'
 import { challengeRoutes } from './routes/challenges.js'
+import { adminRoutes } from './routes/admin.js'
 
 // Global error type
 interface CustomError extends Error {
@@ -82,6 +83,7 @@ async function registerPlugins() {
     await fastify.register(authRoutes, { prefix: '/api/auth' })
     await fastify.register(routineRoutes, { prefix: '/api/routines' })
     await fastify.register(challengeRoutes, { prefix: '/api/challenges' })
+    await fastify.register(adminRoutes, { prefix: '/api/admin' })
 
     fastify.log.info('All plugins registered successfully')
   } catch (error) {

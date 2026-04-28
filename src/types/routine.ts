@@ -22,10 +22,19 @@ export interface RoutineResponse {
     name: string
   }
   totalSteps?: number
+  totalDays?: number
   userProgress?: RoutineProgressInfo
 }
 
 export interface RoutineDetailResponse extends RoutineResponse {
+  days: RoutineDayResponse[]
+}
+
+export interface RoutineDayResponse {
+  id: string
+  dayNumber: number
+  name: string
+  description?: string
   steps: RoutineStepResponse[]
 }
 
@@ -55,7 +64,19 @@ export interface CreateRoutineRequest {
   requiredLevel?: SubscriptionLevel
   tags?: string[]
   equipment?: string[]
-  steps: CreateRoutineStepRequest[]
+  days?: CreateRoutineDayRequest[]
+}
+
+export interface CreateRoutineDayRequest {
+  dayNumber: number
+  name: string
+  description?: string
+  steps?: CreateRoutineStepRequest[]
+}
+
+export interface UpdateRoutineDayRequest {
+  name?: string
+  description?: string
 }
 
 export interface CreateRoutineStepRequest {
